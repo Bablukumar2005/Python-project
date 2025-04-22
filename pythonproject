@@ -1,0 +1,160 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Apr 15 07:41:40 2025
+
+@author: ASUS
+"""
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import r2_score
+
+# --- Load Dataset ---
+df = pd.read_csv("C:/Python375/Electric_Vehicle_Population_Data.csv")
+
+# --- Initial EDA ---
+print("\nStructure:")
+print(df.shape)
+
+print("\nColumn Types:")
+print(df.dtypes)
+
+print("\nMissing Values:")
+print(df.isnull().sum())
+
+print("\nSummary Statistics:")
+print(df.describe())
+
+#  Clean Data 
+df.columns = df.columns.str.strip()
+
+
+df['Electric Range'].fillna(df['Electric Range'].median(), inplace=True)
+df['Base MSRP'].fillna(df['Base MSRP'].mean(), inplace=True)
+df['Model Year'].fillna(df['Model Year'].mode()[0], inplace=True)
+df['Electric Vehicle Type'].fillna("Unknown", inplace=True)
+df.drop(columns=['State'], inplace=True)
+
+# Visualizations 
+sns.heatmap(df.isnull(), cbar=False, cmap='viridis')
+plt.title('Missing Data Heatmap')
+plt.show()
+# Outliers and Inlier
+
+numeric_cols = ["Electric Range", "Base MSRP"]
+outliers = []
+
+for col in numeric_cols:
+    Q1 = df[col].quantile(0.25)
+    Q3 = df[col].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    outliers.extend(df[(df[col] < lower_bound) | (df[col] > upper_bound)].index)
+
+#df = df.drop(index=set(outliers))
+
+#print("Data shape after outlier removal:", df.shape)
+
+#sns.set(style="whitegrid")
+plt.rcParams["figure.figsize"] = (10, 6)
+
+# 1. Top Vehicle Makes
+top_makes = df['Make'].value_counts().nlargest(10)
+sns.barplot(x=top_makes.values, y=top_makes.index, palette='viridis')
+plt.title('Top 10 Vehicle Makes')
+plt.xlabel('Count')
+plt.ylabel('Make')
+plt.tight_layout()
+plt.show()
+
+# 2. EV Types Pie Chart
+ev_type_counts = df['Electric Vehicle Type'].value_counts()
+plt.pie(ev_type_counts, labels=ev_type_counts.index, autopct='%1.1f%%', startangle=140, colors=sns.color_palette("pastel"))
+plt.axis('equal')
+plt.title('Electric Vehicle Types')
+plt.show()
+
+# 3. Top Cities with Most EVs
+top_cities = df['City'].value_counts().nlargest(10)
+sns.barplot(x=top_cities.values, y=top_cities.index, palette='cubehelix')
+plt.title('Top 10 Cities with Most EVs')
+plt.xlabel('Count')
+plt.ylabel('City')
+plt.tight_layout()
+plt.show()
+
+# 4. Electric Range Distribution
+sns.histplot(df['Electric Range'], bins=30, kde=True, color='purple')
+plt.title('Distribution of Electric Range')
+plt.xlabel('Electric Range (miles)')
+plt.ylabel('Frequency')
+plt.tight_layout()
+plt.show()
+
+# 5. Electric Range vs. Model Year (Boxplot)
+sns.boxplot(x='Model Year', y='Electric Range', data=df)
+plt.xticks(rotation=45)
+plt.title('Electric Range by Model Year')
+plt.xlabel('Model Year')
+plt.ylabel('Electric Range')
+plt.tight_layout()
+plt.show()
+
+# 6. EVs by County
+top_counties = df['County'].value_counts().nlargest(10)
+sns.barplot(x=top_counties.values, y=top_counties.index, palette='Set1')
+plt.title('Top 10 Counties by EV Count')
+plt.xlabel('Count')
+plt.ylabel('County')
+plt.tight_layout()
+plt.show()
+
+# 7. Heatmap of Numerical Correlation
+corr_matrix = df[['Model Year', 'Electric Range', 'Base MSRP']].corr()
+sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', linewidths=0.5)
+plt.title('Heatmap of Numerical Features')
+plt.show()
+
+# 8. Scatter Plot with Linear Regression
+df = df[(df['Model Year'] >= 2010) & (df['Electric Range'] > 0)]
+X = df[['Model Year']]
+y = df[['Electric Range']]
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+model = LinearRegression()
+model.fit(X_train, y_train)
+
+x_vals = np.linspace(df['Model Year'].min(), df['Model Year'].max(), 100).reshape(-1, 1)
+y_pred = model.predict(x_vals)
+r2 = r2_score(y_test, model.predict(X_test))
+
+sns.scatterplot(x='Model Year', y='Electric Range', hue='Electric Vehicle Type', data=df, alpha=0.6, palette='Set1')
+plt.plot(x_vals, y_pred, color='black', linewidth=2, label=f'Regression Line (R² = {r2:.2f})')
+plt.title('Model Year vs. Electric Range with Linear Regression')
+plt.xlabel('Model Year')
+plt.ylabel('Electric Range (miles)')
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+# 9. Annual EV Registrations
+year_counts = df['Model Year'].value_counts().sort_index()
+sns.lineplot(x=year_counts.index, y=year_counts.values, marker='o')
+plt.title('EV Registrations by Year')
+plt.xlabel('Model Year')
+plt.ylabel('Count')
+plt.tight_layout()
+plt.show()
+
+# 10. Pair Plot
+selected_cols = ['Model Year', 'Base MSRP', 'Postal Code', 'Electric Range']
+df_clean = df[selected_cols + ['Electric Vehicle Type']].dropna()
+sns.pairplot(df_clean, hue='Electric Vehicle Type', palette='Set2')
+plt.suptitle("Pair Plot by Electric Vehicle Type", y=1.02, fontsize=14)
+plt.show()
